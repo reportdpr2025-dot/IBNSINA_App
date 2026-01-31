@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">IBN SINA</string>
+    <string name="title_activity_pharma_menu">PharmaMenuActivity</string>
+    <string name="title_activity_inm_menu">InmMenuActivity</string>
+    <string name="title_activity_sina_vision_menu">SinaVisionMenuActivity</string>
+    <string name="title_activity_settings">SettingsActivity</string>
+</resources>
