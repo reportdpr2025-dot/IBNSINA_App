@@ -54,12 +54,17 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         InventoryModel model = list.get(position);
 
+        // সিরিয়াল নম্বর সেট করা
+        if (holder.tvSl != null) {
+            String slValue = (model.getSl() != null && !model.getSl().isEmpty()) ? model.getSl() : String.valueOf(position + 1);
+            holder.tvSl.setText(slValue);
+        }
+        
+        if (holder.tvCategory != null) holder.tvCategory.setText(model.getCategory());
         if (holder.tvProductName != null) holder.tvProductName.setText(model.getProductName());
         if (holder.tvCode != null) holder.tvCode.setText(model.getCode());
-        if (holder.tvCategory != null) holder.tvCategory.setText(model.getCategory());
         if (holder.tvPackSize != null) holder.tvPackSize.setText("Pack size: " + model.getPackSize());
         
-        // --- ক্যালকুলেশন লজিক শুরু ---
         int totalStock = 0;
         int cartonSize = 0;
         int calculatedCartonQty = 0;
@@ -68,26 +73,21 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
         try {
             totalStock = Integer.parseInt(model.getTotalQty().trim());
             cartonSize = Integer.parseInt(model.getCartonSize().trim());
-
             if (cartonSize > 0) {
-                calculatedCartonQty = totalStock / cartonSize; // সামনের পূর্ণ সংখ্যা (Integer Division)
-                calculatedLooseQty = totalStock - (calculatedCartonQty * cartonSize); // অবশিষ্ট অংশ
+                calculatedCartonQty = totalStock / cartonSize;
+                calculatedLooseQty = totalStock - (calculatedCartonQty * cartonSize);
             } else {
                 calculatedLooseQty = totalStock;
             }
         } catch (Exception e) {
-            // যদি সংখ্যা না থাকে তবে ডিফল্ট হিসেবে মডেলের ডাটাই দেখাবে
             calculatedLooseQty = 0;
             calculatedCartonQty = 0;
         }
 
         if (holder.tvTotalQty != null) holder.tvTotalQty.setText("Total Stock: " + totalStock);
         if (holder.tvCartonSize != null) holder.tvCartonSize.setText("Crton Size: " + cartonSize);
-        
-        // আপনার চাহিদা অনুযায়ী ক্যালকুলেটেড ভ্যালু সেট করা হচ্ছে
         if (holder.tvCarton != null) holder.tvCarton.setText("Carton Qty: " + calculatedCartonQty);
         if (holder.tvLoose != null) holder.tvLoose.setText("Loose Qty: " + calculatedLooseQty);
-        // --- ক্যালকুলেশন লজিক শেষ ---
 
         if (holder.etShortQty != null) holder.etShortQty.setText(model.getShortQty());
         if (holder.etExcessQty != null) holder.etExcessQty.setText(model.getExcessQty());
@@ -126,10 +126,10 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
             }
 
             if ("Checked".equalsIgnoreCase(model.getStatus())) {
-                new AlertDialog.Builder(context)
+                AlertDialog dialog = new AlertDialog.Builder(context)
                         .setTitle("Uncheck Item?")
                         .setMessage("Do you want to uncheck this item?")
-                        .setPositiveButton("Yes", (dialog, which) -> {
+                        .setPositiveButton("Yes", (dialogInterface, which) -> {
                             String status = "Unchecked";
                             model.setStatus(status);
                             holder.btnCheckUpdate.setChecked(false);
@@ -139,6 +139,12 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
                         })
                         .setNegativeButton("No", null)
                         .show();
+
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setBackgroundColor(Color.parseColor("#4CAF50"));
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setBackgroundColor(Color.parseColor("#F44336"));
+                
                 return true;
             }
             return false;
@@ -157,23 +163,23 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
             String encodedR = URLEncoder.encode(r, "UTF-8");
             String encodedStatus = URLEncoder.encode(status, "UTF-8");
 
-            String url = "https://script.google.com/macros/s/AKfycbxf8kiSeqv49M-S9LAE956_CauL-Ow2fNnE5c6Dw7HTFMEa85INc6lz8xw3P8CY9uhjbw/exec?action=updateStock"
+            String url = Config.SCRIPT_URL + "?action=updateStock"
                     + "&code=" + encodedCode + "&shortQty=" + encodedS + "&excessQty=" + encodedE + "&remark=" + encodedR + "&status=" + encodedStatus;
 
             StringRequest request = new StringRequest(Request.Method.GET, url,
                     res -> {
                         if (context instanceof MainActivity) {
                             ((MainActivity) context).setLoading(false);
+                            ((MainActivity) context).showBigSuccessDialog();
                         }
                         dbHelper.deleteUpdate(code);
-                        Toast.makeText(context, "Update Successful!", Toast.LENGTH_SHORT).show();
                     },
                     err -> {
                         if (context instanceof MainActivity) {
                             ((MainActivity) context).setLoading(false);
                         }
                         dbHelper.addUpdate(code, s, e, r, status);
-                        Toast.makeText(context, "Saved offline. Will sync when online.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(context, "Saved offline.", Toast.LENGTH_SHORT).show();
                     });
 
             request.setRetryPolicy(new DefaultRetryPolicy(20000, 1, 1f));
@@ -186,13 +192,14 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
     @Override public int getItemCount() { return list == null ? 0 : list.size(); }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvCategory, tvPackSize, tvCode, tvProductName, tvTotalQty, tvLoose, tvCarton, tvCartonSize;
+        TextView tvSl, tvCategory, tvPackSize, tvCode, tvProductName, tvTotalQty, tvLoose, tvCarton, tvCartonSize;
         EditText etShortQty, etExcessQty, etRemark;
         CheckBox btnCheckUpdate;
         LinearLayout itemContainer;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
+            tvSl = itemView.findViewById(R.id.tvSl);
             tvCategory = itemView.findViewById(R.id.tvCategory);
             tvPackSize = itemView.findViewById(R.id.tvPackSize);
             tvCode = itemView.findViewById(R.id.tvCode);

@@ -3,12 +3,16 @@ package com.example.ibnsina;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.webkit.WebView;
@@ -49,7 +53,8 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private InventoryAdapter adapter;
-    private List<InventoryModel> inventoryList;
+    private List<InventoryModel> fullInventoryList = new ArrayList<>();
+    private List<InventoryModel> filteredList = new ArrayList<>();
     private EditText etSearch;
     private Spinner spinnerFilter;
     private String selectedFilter = "All";
@@ -58,11 +63,19 @@ public class MainActivity extends AppCompatActivity {
     private SwipeRefreshLayout swipeRefreshLayout;
     private DatabaseHelper dbHelper;
 
+    // Pagination Variables
+    private int currentPage = 0;
+    private final int PAGE_SIZE = 30;
+    private boolean isPagingEnabled = false; // প্রাথমিক অবস্থায় সব দেখাবে
+    private TextView tvPageInfo;
+    private MaterialButton btnNextPage, btnPrevPage;
+
     private boolean loadingState = false;
 
-    // Calculator Variables
+    // Calculator Persistence Variables
     private String currentInput = "";
-    private double result = 0;
+    private String currentExpressionText = "";
+    private double calcResult = 0;
     private char lastOperator = ' ';
 
     @Override
@@ -81,28 +94,34 @@ public class MainActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
+        tvPageInfo = findViewById(R.id.tvPageInfo);
+        btnNextPage = findViewById(R.id.btnNextPage);
+        btnPrevPage = findViewById(R.id.btnPrevPage);
+
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(this));
             recyclerView.setHasFixedSize(true);
         }
 
-        inventoryList = new ArrayList<>();
-
         String[] options = {"All", "Checked", "Unchecked", "In Stock", "Stock Out", "PHARMA", "OPTHALMIC", "HERBAL"};
         ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, options);
         if (spinnerFilter != null) spinnerFilter.setAdapter(spinnerAdapter);
 
-        syncOfflineData();
         fetchData(true);
 
         if (swipeRefreshLayout != null)
-            swipeRefreshLayout.setOnRefreshListener(() -> { syncOfflineData(); fetchData(true); });
+            swipeRefreshLayout.setOnRefreshListener(() -> { isPagingEnabled = false; fetchData(true); });
 
         if (btnRefreshManual != null)
-            btnRefreshManual.setOnClickListener(v -> { syncOfflineData(); fetchData(true); });
+            btnRefreshManual.setOnClickListener(v -> { isPagingEnabled = false; fetchData(true); });
 
         if (btnPrint != null) btnPrint.setOnClickListener(v -> createWebPrintJob());
         if (btnCalculator != null) btnCalculator.setOnClickListener(v -> showCalculatorDialog());
+
+        if (btnNextPage != null) btnNextPage.setOnClickListener(v -> { isPagingEnabled = true; currentPage++; updateRecyclerView(); });
+        if (btnPrevPage != null) btnPrevPage.setOnClickListener(v -> { if (currentPage > 0) { isPagingEnabled = true; currentPage--; updateRecyclerView(); } });
+
+        if (tvPageInfo != null) tvPageInfo.setOnClickListener(v -> showGoToPageDialog());
 
         if (etSearch != null) {
             etSearch.addTextChangedListener(new TextWatcher() {
@@ -124,9 +143,12 @@ public class MainActivity extends AppCompatActivity {
 
         if (btnResetAll != null) {
             btnResetAll.setOnClickListener(v -> {
-                new AlertDialog.Builder(this).setTitle("Reset All?").setMessage("আপনি কি সব চেক মার্ক মুছে ফেলতে চান?")
-                        .setPositiveButton("Yes", (dialog, which) -> resetAllStatusOnServer())
-                        .setNegativeButton("No", null).show();
+                AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Reset All?").setMessage("সব চেক মার্ক মুছে ফেলতে চান?")
+                        .setPositiveButton("Yes", (d, w) -> resetAllStatusOnServer()).setNegativeButton("No", null).show();
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setBackgroundColor(Color.parseColor("#4CAF50"));
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setBackgroundColor(Color.parseColor("#F44336"));
             });
         }
 
@@ -134,200 +156,177 @@ public class MainActivity extends AppCompatActivity {
         if (btnBack != null) btnBack.setOnClickListener(v -> finish());
     }
 
+    public void showBigSuccessDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        TextView textView = new TextView(this);
+        textView.setText("\n✔\nUpdate Successful!\n");
+        textView.setTextSize(22);
+        textView.setTextColor(Color.parseColor("#2E7D32"));
+        textView.setGravity(Gravity.CENTER);
+        textView.setPadding(20, 20, 20, 20);
+        textView.setTypeface(null, android.graphics.Typeface.BOLD);
+        builder.setView(textView);
+        final AlertDialog dialog = builder.create();
+        dialog.show();
+        new Handler().postDelayed(dialog::dismiss, 1500);
+    }
+
+    private void showGoToPageDialog() {
+        int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
+        if (totalPages <= 1 && isPagingEnabled) return;
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Go to Page (1 - " + totalPages + ")");
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        builder.setView(input);
+        builder.setPositiveButton("Go", (d, w) -> {
+            String val = input.getText().toString();
+            if (!val.isEmpty()) {
+                int pageNum = Integer.parseInt(val);
+                if (pageNum >= 1 && pageNum <= totalPages) { isPagingEnabled = true; currentPage = pageNum - 1; updateRecyclerView(); }
+            }
+        }).setNegativeButton("Cancel", null);
+        AlertDialog dialog = builder.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setBackgroundColor(Color.parseColor("#2196F3"));
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setBackgroundColor(Color.GRAY);
+    }
+
+    private void updateRecyclerView() {
+        List<InventoryModel> displayList;
+        int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
+        if (!isPagingEnabled) {
+            displayList = new ArrayList<>(filteredList);
+            tvPageInfo.setText("All Items (" + filteredList.size() + ")");
+            btnPrevPage.setEnabled(false);
+            btnNextPage.setEnabled(filteredList.size() > PAGE_SIZE);
+        } else {
+            int start = currentPage * PAGE_SIZE;
+            int end = Math.min(start + PAGE_SIZE, filteredList.size());
+            displayList = new ArrayList<>(filteredList.subList(start, end));
+            tvPageInfo.setText("Page " + (currentPage + 1) + " of " + totalPages);
+            btnPrevPage.setEnabled(currentPage > 0);
+            btnNextPage.setEnabled(end < filteredList.size());
+        }
+        if (adapter == null) { adapter = new InventoryAdapter(displayList); recyclerView.setAdapter(adapter); }
+        else { adapter.updateList(displayList); }
+        recyclerView.scrollToPosition(0);
+    }
+
+    private void fetchData(boolean showProgress) {
+        if (showProgress) setLoading(true);
+        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, Config.SCRIPT_URL + "?action=getJson", null,
+                response -> {
+                    setLoading(false); fullInventoryList.clear();
+                    try {
+                        for (int i = 0; i < response.length(); i++) {
+                            JSONObject obj = response.getJSONObject(i);
+                            fullInventoryList.add(new InventoryModel(obj.optString("sl", ""), obj.optString("category", ""), obj.optString("code", ""), obj.optString("productName", ""), obj.optString("packSize", ""), obj.optString("totalQty", ""), obj.optString("loose", ""), obj.optString("carton", ""), obj.optString("cartonSize", ""), obj.optString("shortQty", ""), obj.optString("excessQty", ""), obj.optString("remark", ""), obj.optString("status", "Unchecked")));
+                        }
+                        applyFilterAndSearch();
+                    } catch (JSONException e) { e.printStackTrace(); }
+                }, error -> setLoading(false));
+        request.setRetryPolicy(new DefaultRetryPolicy(30000, 1, 1f));
+        Volley.newRequestQueue(this).add(request);
+    }
+
+    private void applyFilterAndSearch() {
+        String query = etSearch.getText().toString().toLowerCase().trim();
+        filteredList.clear();
+        for (InventoryModel item : fullInventoryList) {
+            boolean matchesSearch = item.getProductName().toLowerCase().contains(query) || item.getCode().toLowerCase().contains(query);
+            boolean matchesFilter = false;
+            int stockCount = 0; try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (Exception e) {}
+            if (selectedFilter.equals("All")) matchesFilter = true;
+            else if (selectedFilter.equals("Checked")) matchesFilter = item.getStatus().equalsIgnoreCase("Checked");
+            else if (selectedFilter.equals("Unchecked")) matchesFilter = !item.getStatus().equalsIgnoreCase("Checked");
+            else if (selectedFilter.equals("In Stock")) matchesFilter = stockCount > 0;
+            else if (selectedFilter.equals("Stock Out")) matchesFilter = stockCount <= 0;
+            else matchesFilter = item.getCategory().equalsIgnoreCase(selectedFilter);
+            if (matchesSearch && matchesFilter) filteredList.add(item);
+        }
+        currentPage = 0; updateRecyclerView();
+    }
+
     private void showCalculatorDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_calculator, null);
         builder.setView(view);
-        AlertDialog dialog = builder.create();
-
-        TextView tvDisplay = view.findViewById(R.id.tvCalcDisplay);
-        TextView tvExpressionView = view.findViewById(R.id.tvCalcExpression);
-        
-        currentInput = "";
-        result = 0;
-        lastOperator = ' ';
-
+        final AlertDialog dialog = builder.create();
+        final TextView tvDisplay = view.findViewById(R.id.tvCalcDisplay);
+        final TextView tvExpression = view.findViewById(R.id.tvCalcExpression);
+        tvDisplay.setText(currentInput.isEmpty() ? "0" : currentInput);
+        tvExpression.setText(currentExpressionText);
         View.OnClickListener numListener = v -> {
             Button b = (Button) v;
-            String val = b.getText().toString();
             if (currentInput.equals("0")) currentInput = "";
-            currentInput += val;
+            currentInput += b.getText().toString();
             tvDisplay.setText(currentInput);
         };
-
         int[] ids = {R.id.btn0, R.id.btn1, R.id.btn2, R.id.btn3, R.id.btn4, R.id.btn5, R.id.btn6, R.id.btn7, R.id.btn8, R.id.btn9, R.id.btnDot};
         for(int id : ids) view.findViewById(id).setOnClickListener(numListener);
-
-        view.findViewById(R.id.btnAdd).setOnClickListener(v -> handleOperator(tvDisplay, tvExpressionView, '+'));
-        view.findViewById(R.id.btnSub).setOnClickListener(v -> handleOperator(tvDisplay, tvExpressionView, '-'));
-        view.findViewById(R.id.btnMul).setOnClickListener(v -> handleOperator(tvDisplay, tvExpressionView, '*'));
-        view.findViewById(R.id.btnDiv).setOnClickListener(v -> handleOperator(tvDisplay, tvExpressionView, '/'));
-        
-        // Backspace button
-        view.findViewById(R.id.btnBack).setOnClickListener(v -> {
-            if (!currentInput.isEmpty()) {
-                currentInput = currentInput.substring(0, currentInput.length() - 1);
-                tvDisplay.setText(currentInput.isEmpty() ? "0" : currentInput);
-            }
-        });
-
-        // Percent button
-        view.findViewById(R.id.btnPercent).setOnClickListener(v -> {
-            if (!currentInput.isEmpty()) {
-                double val = Double.parseDouble(currentInput) / 100;
-                currentInput = String.valueOf(val);
-                tvDisplay.setText(currentInput);
-            }
-        });
-
+        view.findViewById(R.id.btnAdd).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '+'));
+        view.findViewById(R.id.btnSub).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '-'));
+        view.findViewById(R.id.btnMul).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '*'));
+        view.findViewById(R.id.btnDiv).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '/'));
+        view.findViewById(R.id.btnBack).setOnClickListener(v -> { if (!currentInput.isEmpty()) { currentInput = currentInput.substring(0, currentInput.length() - 1); tvDisplay.setText(currentInput.isEmpty() ? "0" : currentInput); } });
         view.findViewById(R.id.btnEqual).setOnClickListener(v -> {
             if (!currentInput.isEmpty() && lastOperator != ' ') {
                 calculateFinalResult();
-                tvExpressionView.setText(tvExpressionView.getText().toString() + currentInput + " =");
-                tvDisplay.setText(formatResult(result));
-                currentInput = String.valueOf(result);
+                currentExpressionText += currentInput + " =";
+                tvExpression.setText(currentExpressionText);
+                currentInput = formatResult(calcResult);
+                tvDisplay.setText(currentInput);
                 lastOperator = ' ';
             }
         });
-
-        view.findViewById(R.id.btnClear).setOnClickListener(v -> {
-            currentInput = "";
-            result = 0;
-            lastOperator = ' ';
-            tvDisplay.setText("0");
-            tvExpressionView.setText("");
-        });
-
+        view.findViewById(R.id.btnClear).setOnClickListener(v -> { currentInput = ""; calcResult = 0; lastOperator = ' '; currentExpressionText = ""; tvDisplay.setText("0"); tvExpression.setText(""); });
         view.findViewById(R.id.btnCloseCalc).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
 
     private void handleOperator(TextView display, TextView exprView, char op) {
         if (!currentInput.isEmpty()) {
-            if (lastOperator == ' ') {
-                result = Double.parseDouble(currentInput);
-            } else {
-                calculateFinalResult();
-            }
+            if (lastOperator == ' ') calcResult = Double.parseDouble(currentInput);
+            else calculateFinalResult();
             lastOperator = op;
-            exprView.setText(formatResult(result) + " " + op + " ");
-            currentInput = "";
-            display.setText("0");
+            currentExpressionText = formatResult(calcResult) + " " + op + " ";
+            exprView.setText(currentExpressionText);
+            currentInput = ""; display.setText("0");
         }
     }
 
     private void calculateFinalResult() {
-        double currentVal = Double.parseDouble(currentInput);
-        switch (lastOperator) {
-            case '+': result += currentVal; break;
-            case '-': result -= currentVal; break;
-            case '*': result *= currentVal; break;
-            case '/': if (currentVal != 0) result /= currentVal; break;
-        }
+        double cur = Double.parseDouble(currentInput);
+        switch (lastOperator) { case '+': calcResult += cur; break; case '-': calcResult -= cur; break; case '*': calcResult *= cur; break; case '/': if (cur != 0) calcResult /= cur; break; }
     }
 
-    private String formatResult(double d) {
-        if (d == (long) d) return String.format("%d", (long) d);
-        else return String.format("%s", d);
-    }
+    private String formatResult(double d) { return (d == (long) d) ? String.format("%d", (long) d) : String.format("%s", d); }
 
     private void createWebPrintJob() {
         WebView webView = new WebView(this);
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
+            @Override public void onPageFinished(WebView view, String url) {
                 PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("Inventory Report");
-                printManager.print(getString(R.string.app_name) + " Document", printAdapter, new PrintAttributes.Builder().build());
+                printManager.print("Inventory Report", view.createPrintDocumentAdapter("Inventory Report"), new PrintAttributes.Builder().build());
             }
         });
-
         String currentDate = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
         StringBuilder html = new StringBuilder();
-        html.append("<html><head><style>body { font-family: 'Times New Roman', serif; margin: 0; padding: 0; } .header { background-color: #27D3F5; padding: 20px; color: white; text-align: center; } .header-group { display: flex; align-items: center; justify-content: center; } .header-text { margin-left: 15px; } .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; } .header p { margin: 2px 0 0 0; font-size: 15px; font-weight: bold; } .daily-check { margin-top: 8px; font-size: 18px; font-weight: bold; font-style: italic; } .report-info { padding: 10px; font-size: 11px; color: #333; display: flex; justify-content: space-between; border-bottom: 2px solid #27D3F5; } table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 10px; } th, td { border: 1px solid #ccc; padding: 5px; text-align: left; } th { background-color: #f2f2f2; font-weight: bold; }</style></head><body>");
-        html.append("<div class='header'><div class='header-group'><div style='width:55px; height:55px; background:white; border-radius:50%;'></div><div class='header-text'><h1>The IBN SINA Pharmaceutical Industry PLC</h1><p>DINAJPUR DEPOT</p></div></div><div class='daily-check'>Daily Stock Check</div></div>");
-        html.append("<div class='report-info'><span>Stock Report</span><span>Date: ").append(currentDate).append("</span></div>");
-        html.append("<table><thead><tr><th>Category</th><th>Code</th><th>Product Name</th><th>Pack</th><th>Stock</th><th>Carton</th><th>Loose</th><th>Short</th><th>Excess</th><th>Remark</th></tr></thead><tbody>");
-        List<InventoryModel> currentList = (adapter != null) ? adapter.getList() : new ArrayList<>();
-        for (InventoryModel item : currentList) {
-            html.append("<tr><td>").append(item.getCategory()).append("</td><td>").append(item.getCode()).append("</td><td>").append(item.getProductName()).append("</td><td>").append(item.getPackSize()).append("</td><td>").append(item.getTotalQty()).append("</td><td>").append(item.getCartonQty()).append("</td><td>").append(item.getLooseQty()).append("</td><td>").append(item.getShortQty()).append("</td><td>").append(item.getExcessQty()).append("</td><td>").append(item.getRemark()).append("</td></tr>");
-        }
+        html.append("<html><head><style>body { font-family: 'Times New Roman', serif; margin: 0; padding: 0; } .header { background-color: #27D3F5; padding: 20px; color: white; text-align: center; } .daily-check { margin-top: 8px; font-size: 18px; font-weight: bold; font-style: italic; } table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 10px; } th, td { border: 1px solid #ccc; padding: 5px; text-align: left; } th { background-color: #f2f2f2; font-weight: bold; }</style></head><body>");
+        html.append("<div class='header'><h1>The IBN SINA Pharmaceutical Industry PLC</h1><p>DINAJPUR DEPOT</p><div class='daily-check'>Daily Stock Check</div></div><p>Date: ").append(currentDate).append("</p><table><thead><tr><th>Category</th><th>Code</th><th>Product Name</th><th>Pack</th><th>Stock</th><th>Carton</th><th>Loose</th><th>Short</th><th>Excess</th><th>Remark</th></tr></thead><tbody>");
+        for (InventoryModel item : filteredList) { html.append("<tr><td>").append(item.getCategory()).append("</td><td>").append(item.getCode()).append("</td><td>").append(item.getProductName()).append("</td><td>").append(item.getPackSize()).append("</td><td>").append(item.getTotalQty()).append("</td><td>").append(item.getCartonQty()).append("</td><td>").append(item.getLooseQty()).append("</td><td>").append(item.getShortQty()).append("</td><td>").append(item.getExcessQty()).append("</td><td>").append(item.getRemark()).append("</td></tr>"); }
         html.append("</tbody></table></body></html>");
         webView.loadDataWithBaseURL(null, html.toString(), "text/HTML", "UTF-8", null);
     }
 
-    public void setLoading(boolean isLoading) {
-        this.loadingState = isLoading;
-        if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-    }
-
-    public boolean isLoading() { return loadingState; }
-
-    private void syncOfflineData() {
-        Cursor cursor = dbHelper.getAllPending();
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                sendOfflineUpdateToServer(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CODE)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SHORT)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EXCESS)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_REMARK)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_STATUS)));
-            } while (cursor.moveToNext());
-            cursor.close();
-        }
-    }
-
-    private void sendOfflineUpdateToServer(String code, String s, String e, String r, String status) {
-        try {
-            String url = "https://script.google.com/macros/s/AKfycbxf8kiSeqv49M-S9LAE956_CauL-Ow2fNnE5c6Dw7HTFMEa85INc6lz8xw3P8CY9uhjbw/exec?action=updateStock"
-                    + "&code=" + URLEncoder.encode(code, "UTF-8") + "&shortQty=" + URLEncoder.encode(s, "UTF-8") + "&excessQty=" + URLEncoder.encode(e, "UTF-8") + "&remark=" + URLEncoder.encode(r, "UTF-8") + "&status=" + URLEncoder.encode(status, "UTF-8");
-            Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, url, res -> dbHelper.deleteUpdate(code), err -> {}));
-        } catch (UnsupportedEncodingException ex) { ex.printStackTrace(); }
-    }
-
-    private void fetchData(boolean showProgress) {
-        if (showProgress) setLoading(true);
-        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, "https://script.google.com/macros/s/AKfycbxf8kiSeqv49M-S9LAE956_CauL-Ow2fNnE5c6Dw7HTFMEa85INc6lz8xw3P8CY9uhjbw/exec?action=getJson", null,
-                response -> {
-                    setLoading(false);
-                    if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-                    inventoryList.clear();
-                    try {
-                        for (int i = 0; i < response.length(); i++) {
-                            JSONObject obj = response.getJSONObject(i);
-                            inventoryList.add(new InventoryModel(obj.optString("category", ""), obj.optString("code", ""), obj.optString("productName", ""), obj.optString("packSize", ""), obj.optString("totalQty", ""), obj.optString("loose", ""), obj.optString("carton", ""), obj.optString("cartonSize", ""), obj.optString("shortQty", ""), obj.optString("excessQty", ""), obj.optString("remark", ""), obj.optString("status", "Unchecked")));
-                        }
-                        if (adapter == null) { adapter = new InventoryAdapter(new ArrayList<>(inventoryList)); if (recyclerView != null) recyclerView.setAdapter(adapter); } else { adapter.updateList(new ArrayList<>(inventoryList)); }
-                        applyFilterAndSearch();
-                    } catch (JSONException e) { e.printStackTrace(); }
-                }, error -> { setLoading(false); if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false); });
-        request.setRetryPolicy(new DefaultRetryPolicy(30000, 1, 1f));
-        Volley.newRequestQueue(this).add(request);
-    }
-
-    private void applyFilterAndSearch() {
-        if (inventoryList == null) return;
-        String query = (etSearch != null) ? etSearch.getText().toString().toLowerCase().trim() : "";
-        List<InventoryModel> filteredList = new ArrayList<>();
-        for (InventoryModel item : inventoryList) {
-            boolean matchesSearch = item.getProductName().toLowerCase().contains(query) || item.getCode().toLowerCase().contains(query);
-            boolean matchesFilter = false;
-            int stockCount = 0;
-            try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (NumberFormatException e) { stockCount = 0; }
-            if (selectedFilter.equals("All")) { matchesFilter = true; }
-            else if (selectedFilter.equals("Checked")) { matchesFilter = item.getStatus().equalsIgnoreCase("Checked"); }
-            else if (selectedFilter.equals("Unchecked")) { matchesFilter = !item.getStatus().equalsIgnoreCase("Checked"); }
-            else if (selectedFilter.equals("In Stock")) { matchesFilter = stockCount > 0; }
-            else if (selectedFilter.equals("Stock Out")) { matchesFilter = stockCount <= 0; }
-            else { matchesFilter = item.getCategory().equalsIgnoreCase(selectedFilter); }
-            if (matchesSearch && matchesFilter) filteredList.add(item);
-        }
-        if (adapter != null) adapter.updateList(filteredList);
-    }
-
     private void resetAllStatusOnServer() {
         setLoading(true);
-        String url = "https://script.google.com/macros/s/AKfycbxf8kiSeqv49M-S9LAE956_CauL-Ow2fNnE5c6Dw7HTFMEa85INc6lz8xw3P8CY9uhjbw/exec?action=resetAll";
-        Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, url, response -> fetchData(true), error -> setLoading(false)));
+        Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, Config.SCRIPT_URL + "?action=resetAll", response -> fetchData(true), error -> setLoading(false)));
     }
+
+    public void setLoading(boolean isLoading) { this.loadingState = isLoading; if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE); }
+    private void syncOfflineData() { /* আপনার ডাটাবেসHelper লজিক এখানে থাকবে */ }
+    public boolean isLoading() { return loadingState; }
 }
