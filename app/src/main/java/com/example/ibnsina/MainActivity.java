@@ -63,10 +63,9 @@ public class MainActivity extends AppCompatActivity {
     private SwipeRefreshLayout swipeRefreshLayout;
     private DatabaseHelper dbHelper;
 
-    // Pagination Variables
     private int currentPage = 0;
     private final int PAGE_SIZE = 30;
-    private boolean isPagingEnabled = false; // প্রাথমিক অবস্থায় সব দেখাবে
+    private boolean isPagingEnabled = false; 
     private TextView tvPageInfo;
     private MaterialButton btnNextPage, btnPrevPage;
 
@@ -121,7 +120,9 @@ public class MainActivity extends AppCompatActivity {
         if (btnNextPage != null) btnNextPage.setOnClickListener(v -> { isPagingEnabled = true; currentPage++; updateRecyclerView(); });
         if (btnPrevPage != null) btnPrevPage.setOnClickListener(v -> { if (currentPage > 0) { isPagingEnabled = true; currentPage--; updateRecyclerView(); } });
 
-        if (tvPageInfo != null) tvPageInfo.setOnClickListener(v -> showGoToPageDialog());
+        if (tvPageInfo != null) {
+            tvPageInfo.setOnClickListener(v -> showGoToPageDialog());
+        }
 
         if (etSearch != null) {
             etSearch.addTextChangedListener(new TextWatcher() {
@@ -143,8 +144,12 @@ public class MainActivity extends AppCompatActivity {
 
         if (btnResetAll != null) {
             btnResetAll.setOnClickListener(v -> {
-                AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Reset All?").setMessage("সব চেক মার্ক মুছে ফেলতে চান?")
-                        .setPositiveButton("Yes", (d, w) -> resetAllStatusOnServer()).setNegativeButton("No", null).show();
+                AlertDialog dialog = new AlertDialog.Builder(this)
+                        .setTitle("Reset All?")
+                        .setMessage("আপনি কি সব চেক মার্ক মুছে ফেলতে চান?")
+                        .setPositiveButton("Yes", (dialogInterface, which) -> resetAllStatusOnServer())
+                        .setNegativeButton("No", null)
+                        .show();
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setBackgroundColor(Color.parseColor("#4CAF50"));
@@ -174,18 +179,29 @@ public class MainActivity extends AppCompatActivity {
     private void showGoToPageDialog() {
         int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
         if (totalPages <= 1 && isPagingEnabled) return;
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Go to Page (1 - " + totalPages + ")");
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Enter page number");
         builder.setView(input);
-        builder.setPositiveButton("Go", (d, w) -> {
+
+        builder.setPositiveButton("Go", (dialog, which) -> {
             String val = input.getText().toString();
             if (!val.isEmpty()) {
                 int pageNum = Integer.parseInt(val);
-                if (pageNum >= 1 && pageNum <= totalPages) { isPagingEnabled = true; currentPage = pageNum - 1; updateRecyclerView(); }
+                if (pageNum >= 1 && pageNum <= totalPages) {
+                    isPagingEnabled = true;
+                    currentPage = pageNum - 1;
+                    updateRecyclerView();
+                } else {
+                    Toast.makeText(this, "Invalid page number!", Toast.LENGTH_SHORT).show();
+                }
             }
-        }).setNegativeButton("Cancel", null);
+        });
+        builder.setNegativeButton("Cancel", null);
+        
         AlertDialog dialog = builder.show();
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
@@ -193,9 +209,32 @@ public class MainActivity extends AppCompatActivity {
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setBackgroundColor(Color.GRAY);
     }
 
+    private void applyFilterAndSearch() {
+        if (fullInventoryList == null) return;
+        String query = (etSearch != null) ? etSearch.getText().toString().toLowerCase().trim() : "";
+        filteredList.clear();
+        for (InventoryModel item : fullInventoryList) {
+            boolean matchesSearch = item.getProductName().toLowerCase().contains(query) || item.getCode().toLowerCase().contains(query);
+            boolean matchesFilter = false;
+            int stockCount = 0;
+            try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (Exception e) { stockCount = 0; }
+            if (selectedFilter.equals("All")) matchesFilter = true;
+            else if (selectedFilter.equals("Checked")) matchesFilter = item.getStatus().equalsIgnoreCase("Checked");
+            else if (selectedFilter.equals("Unchecked")) matchesFilter = !item.getStatus().equalsIgnoreCase("Checked");
+            else if (selectedFilter.equals("In Stock")) matchesFilter = stockCount > 0;
+            else if (selectedFilter.equals("Stock Out")) matchesFilter = stockCount <= 0;
+            else matchesFilter = item.getCategory().equalsIgnoreCase(selectedFilter);
+            if (matchesSearch && matchesFilter) filteredList.add(item);
+        }
+        currentPage = 0;
+        updateRecyclerView();
+    }
+
     private void updateRecyclerView() {
         List<InventoryModel> displayList;
         int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
+        if (totalPages == 0) totalPages = 1;
+
         if (!isPagingEnabled) {
             displayList = new ArrayList<>(filteredList);
             tvPageInfo.setText("All Items (" + filteredList.size() + ")");
@@ -209,44 +248,45 @@ public class MainActivity extends AppCompatActivity {
             btnPrevPage.setEnabled(currentPage > 0);
             btnNextPage.setEnabled(end < filteredList.size());
         }
-        if (adapter == null) { adapter = new InventoryAdapter(displayList); recyclerView.setAdapter(adapter); }
-        else { adapter.updateList(displayList); }
-        recyclerView.scrollToPosition(0);
+
+        if (adapter == null) {
+            adapter = new InventoryAdapter(displayList);
+            if (recyclerView != null) recyclerView.setAdapter(adapter);
+        } else {
+            adapter.updateList(displayList);
+        }
+        if (recyclerView != null) recyclerView.scrollToPosition(0);
     }
 
     private void fetchData(boolean showProgress) {
         if (showProgress) setLoading(true);
-        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, Config.SCRIPT_URL + "?action=getJson", null,
+        String url = Config.SCRIPT_URL + "?action=getJson";
+        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
                 response -> {
-                    setLoading(false); fullInventoryList.clear();
+                    setLoading(false);
+                    if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                    fullInventoryList.clear();
                     try {
                         for (int i = 0; i < response.length(); i++) {
                             JSONObject obj = response.getJSONObject(i);
-                            fullInventoryList.add(new InventoryModel(obj.optString("sl", ""), obj.optString("category", ""), obj.optString("code", ""), obj.optString("productName", ""), obj.optString("packSize", ""), obj.optString("totalQty", ""), obj.optString("loose", ""), obj.optString("carton", ""), obj.optString("cartonSize", ""), obj.optString("shortQty", ""), obj.optString("excessQty", ""), obj.optString("remark", ""), obj.optString("status", "Unchecked")));
+                            fullInventoryList.add(new InventoryModel(
+                                    obj.optString("sl", ""),
+                                    obj.optString("category", ""), obj.optString("code", ""),
+                                    obj.optString("productName", ""), obj.optString("packSize", ""),
+                                    obj.optString("totalQty", ""), obj.optString("loose", ""),
+                                    obj.optString("carton", ""), obj.optString("cartonSize", ""),
+                                    obj.optString("shortQty", ""), obj.optString("excessQty", ""),
+                                    obj.optString("remark", ""), obj.optString("status", "Unchecked")
+                            ));
                         }
                         applyFilterAndSearch();
                     } catch (JSONException e) { e.printStackTrace(); }
-                }, error -> setLoading(false));
+                }, error -> {
+            setLoading(false);
+            if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        });
         request.setRetryPolicy(new DefaultRetryPolicy(30000, 1, 1f));
         Volley.newRequestQueue(this).add(request);
-    }
-
-    private void applyFilterAndSearch() {
-        String query = etSearch.getText().toString().toLowerCase().trim();
-        filteredList.clear();
-        for (InventoryModel item : fullInventoryList) {
-            boolean matchesSearch = item.getProductName().toLowerCase().contains(query) || item.getCode().toLowerCase().contains(query);
-            boolean matchesFilter = false;
-            int stockCount = 0; try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (Exception e) {}
-            if (selectedFilter.equals("All")) matchesFilter = true;
-            else if (selectedFilter.equals("Checked")) matchesFilter = item.getStatus().equalsIgnoreCase("Checked");
-            else if (selectedFilter.equals("Unchecked")) matchesFilter = !item.getStatus().equalsIgnoreCase("Checked");
-            else if (selectedFilter.equals("In Stock")) matchesFilter = stockCount > 0;
-            else if (selectedFilter.equals("Stock Out")) matchesFilter = stockCount <= 0;
-            else matchesFilter = item.getCategory().equalsIgnoreCase(selectedFilter);
-            if (matchesSearch && matchesFilter) filteredList.add(item);
-        }
-        currentPage = 0; updateRecyclerView();
     }
 
     private void showCalculatorDialog() {
@@ -326,7 +366,31 @@ public class MainActivity extends AppCompatActivity {
         Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, Config.SCRIPT_URL + "?action=resetAll", response -> fetchData(true), error -> setLoading(false)));
     }
 
-    public void setLoading(boolean isLoading) { this.loadingState = isLoading; if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE); }
-    private void syncOfflineData() { /* আপনার ডাটাবেসHelper লজিক এখানে থাকবে */ }
+    public void setLoading(boolean isLoading) {
+        this.loadingState = isLoading;
+        if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+    }
+
+    private void syncOfflineData() {
+        Cursor cursor = dbHelper.getAllPending();
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                sendOfflineUpdateToServer(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CODE)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SHORT)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EXCESS)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_REMARK)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_STATUS)));
+            } while (cursor.moveToNext());
+            cursor.close();
+        }
+    }
+
+    private void sendOfflineUpdateToServer(String code, String s, String e, String r, String status) {
+        try {
+            String url = Config.SCRIPT_URL + "?action=updateStock&code=" + URLEncoder.encode(code, "UTF-8") + "&shortQty=" + s + "&excessQty=" + e + "&remark=" + URLEncoder.encode(r, "UTF-8") + "&status=" + status;
+            Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, url, res -> dbHelper.deleteUpdate(code), err -> {}));
+        } catch (Exception ex) { ex.printStackTrace(); }
+    }
+
     public boolean isLoading() { return loadingState; }
 }
