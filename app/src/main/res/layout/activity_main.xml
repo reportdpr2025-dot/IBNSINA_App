@@ -7,7 +7,7 @@
     android:background="#F5F5F5"
     tools:context=".MainActivity">
 
-    <!-- Header Section (Fully Centered Container) -->
+    <!-- Header Section -->
     <LinearLayout
         android:id="@+id/headerLayout"
         android:layout_width="match_parent"
@@ -100,7 +100,7 @@
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
                 android:hint="Search products..."
-                android:paddingStart="10dp"
+                android:paddingStart="8dp"
                 android:textSize="14sp" />
 
             <View
@@ -190,7 +190,7 @@
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Pagination & Back Button (All in One Line) -->
+    <!-- Pagination & Checked Counter (Unified Bar) -->
     <LinearLayout
         android:id="@+id/paginationLayout"
         android:layout_width="match_parent"
@@ -209,14 +209,14 @@
             android:layout_height="wrap_content"
             android:text="Back"
             android:textColor="#1B5E20"
-            android:textSize="11sp"
+            android:textSize="10sp"
             app:icon="@android:drawable/ic_menu_revert"
             app:iconTint="#1B5E20" />
 
         <View
             android:layout_width="1dp"
             android:layout_height="24dp"
-            android:layout_marginHorizontal="4dp"
+            android:layout_marginHorizontal="2dp"
             android:background="#DDDDDD" />
 
         <com.google.android.material.button.MaterialButton
@@ -225,18 +225,33 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Prev"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
-        <TextView
-            android:id="@+id/tvPageInfo"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="All Items"
-            android:textColor="#333333"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPageInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="All Items"
+                android:textColor="#333333"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvCheckedCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Checked: 0"
+                android:textColor="#D32F2F"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnNextPage"
@@ -244,7 +259,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Next"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
     <ProgressBar

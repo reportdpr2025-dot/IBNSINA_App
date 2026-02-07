@@ -66,12 +66,11 @@ public class MainActivity extends AppCompatActivity {
     private int currentPage = 0;
     private final int PAGE_SIZE = 30;
     private boolean isPagingEnabled = false; 
-    private TextView tvPageInfo;
+    private TextView tvPageInfo, tvCheckedCount; // tvCheckedCount যোগ করা হলো
     private MaterialButton btnNextPage, btnPrevPage;
 
     private boolean loadingState = false;
 
-    // Calculator Persistence Variables
     private String currentInput = "";
     private String currentExpressionText = "";
     private double calcResult = 0;
@@ -94,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
         tvPageInfo = findViewById(R.id.tvPageInfo);
+        tvCheckedCount = findViewById(R.id.tvCheckedCount); // আইডি বাইন্ডিং
         btnNextPage = findViewById(R.id.btnNextPage);
         btnPrevPage = findViewById(R.id.btnPrevPage);
 
@@ -120,9 +120,7 @@ public class MainActivity extends AppCompatActivity {
         if (btnNextPage != null) btnNextPage.setOnClickListener(v -> { isPagingEnabled = true; currentPage++; updateRecyclerView(); });
         if (btnPrevPage != null) btnPrevPage.setOnClickListener(v -> { if (currentPage > 0) { isPagingEnabled = true; currentPage--; updateRecyclerView(); } });
 
-        if (tvPageInfo != null) {
-            tvPageInfo.setOnClickListener(v -> showGoToPageDialog());
-        }
+        if (tvPageInfo != null) tvPageInfo.setOnClickListener(v -> showGoToPageDialog());
 
         if (etSearch != null) {
             etSearch.addTextChangedListener(new TextWatcher() {
@@ -144,12 +142,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (btnResetAll != null) {
             btnResetAll.setOnClickListener(v -> {
-                AlertDialog dialog = new AlertDialog.Builder(this)
-                        .setTitle("Reset All?")
-                        .setMessage("আপনি কি সব চেক মার্ক মুছে ফেলতে চান?")
-                        .setPositiveButton("Yes", (dialogInterface, which) -> resetAllStatusOnServer())
-                        .setNegativeButton("No", null)
-                        .show();
+                AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Reset All?").setMessage("আপনি কি সব চেক মার্ক মুছে ফেলতে চান?")
+                        .setPositiveButton("Yes", (dialogInterface, which) -> resetAllStatusOnServer()).setNegativeButton("No", null).show();
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setBackgroundColor(Color.parseColor("#4CAF50"));
@@ -159,6 +153,19 @@ public class MainActivity extends AppCompatActivity {
 
         View btnBack = findViewById(R.id.btnBottomBack);
         if (btnBack != null) btnBack.setOnClickListener(v -> finish());
+    }
+
+    // চেক করা আইটেম গুনে দেখানোর মেথড
+    public void updateCheckedCount() {
+        int count = 0;
+        for (InventoryModel item : fullInventoryList) {
+            if ("Checked".equalsIgnoreCase(item.getStatus())) {
+                count++;
+            }
+        }
+        if (tvCheckedCount != null) {
+            tvCheckedCount.setText("Checked: " + count);
+        }
     }
 
     public void showBigSuccessDialog() {
@@ -179,29 +186,18 @@ public class MainActivity extends AppCompatActivity {
     private void showGoToPageDialog() {
         int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
         if (totalPages <= 1 && isPagingEnabled) return;
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Go to Page (1 - " + totalPages + ")");
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setHint("Enter page number");
         builder.setView(input);
-
         builder.setPositiveButton("Go", (dialog, which) -> {
             String val = input.getText().toString();
             if (!val.isEmpty()) {
                 int pageNum = Integer.parseInt(val);
-                if (pageNum >= 1 && pageNum <= totalPages) {
-                    isPagingEnabled = true;
-                    currentPage = pageNum - 1;
-                    updateRecyclerView();
-                } else {
-                    Toast.makeText(this, "Invalid page number!", Toast.LENGTH_SHORT).show();
-                }
+                if (pageNum >= 1 && pageNum <= totalPages) { isPagingEnabled = true; currentPage = pageNum - 1; updateRecyclerView(); }
             }
-        });
-        builder.setNegativeButton("Cancel", null);
-        
+        }).setNegativeButton("Cancel", null);
         AlertDialog dialog = builder.show();
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.WHITE);
@@ -216,8 +212,7 @@ public class MainActivity extends AppCompatActivity {
         for (InventoryModel item : fullInventoryList) {
             boolean matchesSearch = item.getProductName().toLowerCase().contains(query) || item.getCode().toLowerCase().contains(query);
             boolean matchesFilter = false;
-            int stockCount = 0;
-            try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (Exception e) { stockCount = 0; }
+            int stockCount = 0; try { stockCount = Integer.parseInt(item.getTotalQty()); } catch (Exception e) {}
             if (selectedFilter.equals("All")) matchesFilter = true;
             else if (selectedFilter.equals("Checked")) matchesFilter = item.getStatus().equalsIgnoreCase("Checked");
             else if (selectedFilter.equals("Unchecked")) matchesFilter = !item.getStatus().equalsIgnoreCase("Checked");
@@ -226,15 +221,12 @@ public class MainActivity extends AppCompatActivity {
             else matchesFilter = item.getCategory().equalsIgnoreCase(selectedFilter);
             if (matchesSearch && matchesFilter) filteredList.add(item);
         }
-        currentPage = 0;
-        updateRecyclerView();
+        currentPage = 0; updateRecyclerView();
     }
 
     private void updateRecyclerView() {
         List<InventoryModel> displayList;
         int totalPages = (int) Math.ceil((double) filteredList.size() / PAGE_SIZE);
-        if (totalPages == 0) totalPages = 1;
-
         if (!isPagingEnabled) {
             displayList = new ArrayList<>(filteredList);
             tvPageInfo.setText("All Items (" + filteredList.size() + ")");
@@ -248,14 +240,9 @@ public class MainActivity extends AppCompatActivity {
             btnPrevPage.setEnabled(currentPage > 0);
             btnNextPage.setEnabled(end < filteredList.size());
         }
-
-        if (adapter == null) {
-            adapter = new InventoryAdapter(displayList);
-            if (recyclerView != null) recyclerView.setAdapter(adapter);
-        } else {
-            adapter.updateList(displayList);
-        }
-        if (recyclerView != null) recyclerView.scrollToPosition(0);
+        if (adapter == null) { adapter = new InventoryAdapter(displayList); recyclerView.setAdapter(adapter); }
+        else { adapter.updateList(displayList); }
+        recyclerView.scrollToPosition(0);
     }
 
     private void fetchData(boolean showProgress) {
@@ -263,29 +250,17 @@ public class MainActivity extends AppCompatActivity {
         String url = Config.SCRIPT_URL + "?action=getJson";
         JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
                 response -> {
-                    setLoading(false);
-                    if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                    setLoading(false); if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
                     fullInventoryList.clear();
                     try {
                         for (int i = 0; i < response.length(); i++) {
                             JSONObject obj = response.getJSONObject(i);
-                            fullInventoryList.add(new InventoryModel(
-                                    obj.optString("sl", ""),
-                                    obj.optString("category", ""), obj.optString("code", ""),
-                                    obj.optString("productName", ""), obj.optString("packSize", ""),
-                                    obj.optString("totalQty", ""), obj.optString("loose", ""),
-                                    obj.optString("carton", ""), obj.optString("cartonSize", ""),
-                                    obj.optString("shortQty", ""), obj.optString("excessQty", ""),
-                                    obj.optString("remark", ""), obj.optString("status", "Unchecked")
-                            ));
+                            fullInventoryList.add(new InventoryModel(obj.optString("sl", ""), obj.optString("category", ""), obj.optString("code", ""), obj.optString("productName", ""), obj.optString("packSize", ""), obj.optString("totalQty", ""), obj.optString("loose", ""), obj.optString("carton", ""), obj.optString("cartonSize", ""), obj.optString("shortQty", ""), obj.optString("excessQty", ""), obj.optString("remark", ""), obj.optString("status", "Unchecked")));
                         }
+                        updateCheckedCount(); // শুরুতে কাউন্ট আপডেট
                         applyFilterAndSearch();
                     } catch (JSONException e) { e.printStackTrace(); }
-                }, error -> {
-            setLoading(false);
-            if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-        });
-        request.setRetryPolicy(new DefaultRetryPolicy(30000, 1, 1f));
+                }, error -> { setLoading(false); if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false); });
         Volley.newRequestQueue(this).add(request);
     }
 
@@ -298,12 +273,7 @@ public class MainActivity extends AppCompatActivity {
         final TextView tvExpression = view.findViewById(R.id.tvCalcExpression);
         tvDisplay.setText(currentInput.isEmpty() ? "0" : currentInput);
         tvExpression.setText(currentExpressionText);
-        View.OnClickListener numListener = v -> {
-            Button b = (Button) v;
-            if (currentInput.equals("0")) currentInput = "";
-            currentInput += b.getText().toString();
-            tvDisplay.setText(currentInput);
-        };
+        View.OnClickListener numListener = v -> { Button b = (Button) v; if (currentInput.equals("0")) currentInput = ""; currentInput += b.getText().toString(); tvDisplay.setText(currentInput); };
         int[] ids = {R.id.btn0, R.id.btn1, R.id.btn2, R.id.btn3, R.id.btn4, R.id.btn5, R.id.btn6, R.id.btn7, R.id.btn8, R.id.btn9, R.id.btnDot};
         for(int id : ids) view.findViewById(id).setOnClickListener(numListener);
         view.findViewById(R.id.btnAdd).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '+'));
@@ -311,16 +281,7 @@ public class MainActivity extends AppCompatActivity {
         view.findViewById(R.id.btnMul).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '*'));
         view.findViewById(R.id.btnDiv).setOnClickListener(v -> handleOperator(tvDisplay, tvExpression, '/'));
         view.findViewById(R.id.btnBack).setOnClickListener(v -> { if (!currentInput.isEmpty()) { currentInput = currentInput.substring(0, currentInput.length() - 1); tvDisplay.setText(currentInput.isEmpty() ? "0" : currentInput); } });
-        view.findViewById(R.id.btnEqual).setOnClickListener(v -> {
-            if (!currentInput.isEmpty() && lastOperator != ' ') {
-                calculateFinalResult();
-                currentExpressionText += currentInput + " =";
-                tvExpression.setText(currentExpressionText);
-                currentInput = formatResult(calcResult);
-                tvDisplay.setText(currentInput);
-                lastOperator = ' ';
-            }
-        });
+        view.findViewById(R.id.btnEqual).setOnClickListener(v -> { if (!currentInput.isEmpty() && lastOperator != ' ') { calculateFinalResult(); currentExpressionText += currentInput + " ="; tvExpression.setText(currentExpressionText); currentInput = formatResult(calcResult); tvDisplay.setText(currentInput); lastOperator = ' '; } });
         view.findViewById(R.id.btnClear).setOnClickListener(v -> { currentInput = ""; calcResult = 0; lastOperator = ' '; currentExpressionText = ""; tvDisplay.setText("0"); tvExpression.setText(""); });
         view.findViewById(R.id.btnCloseCalc).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
@@ -330,28 +291,16 @@ public class MainActivity extends AppCompatActivity {
         if (!currentInput.isEmpty()) {
             if (lastOperator == ' ') calcResult = Double.parseDouble(currentInput);
             else calculateFinalResult();
-            lastOperator = op;
-            currentExpressionText = formatResult(calcResult) + " " + op + " ";
-            exprView.setText(currentExpressionText);
-            currentInput = ""; display.setText("0");
+            lastOperator = op; currentExpressionText = formatResult(calcResult) + " " + op + " "; exprView.setText(currentExpressionText); currentInput = ""; display.setText("0");
         }
     }
 
-    private void calculateFinalResult() {
-        double cur = Double.parseDouble(currentInput);
-        switch (lastOperator) { case '+': calcResult += cur; break; case '-': calcResult -= cur; break; case '*': calcResult *= cur; break; case '/': if (cur != 0) calcResult /= cur; break; }
-    }
-
+    private void calculateFinalResult() { double cur = Double.parseDouble(currentInput); switch (lastOperator) { case '+': calcResult += cur; break; case '-': calcResult -= cur; break; case '*': calcResult *= cur; break; case '/': if (cur != 0) calcResult /= cur; break; } }
     private String formatResult(double d) { return (d == (long) d) ? String.format("%d", (long) d) : String.format("%s", d); }
 
     private void createWebPrintJob() {
         WebView webView = new WebView(this);
-        webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageFinished(WebView view, String url) {
-                PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                printManager.print("Inventory Report", view.createPrintDocumentAdapter("Inventory Report"), new PrintAttributes.Builder().build());
-            }
-        });
+        webView.setWebViewClient(new WebViewClient() { @Override public void onPageFinished(WebView view, String url) { PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE); printManager.print("Inventory Report", view.createPrintDocumentAdapter("Inventory Report"), new PrintAttributes.Builder().build()); } });
         String currentDate = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
         StringBuilder html = new StringBuilder();
         html.append("<html><head><style>body { font-family: 'Times New Roman', serif; margin: 0; padding: 0; } .header { background-color: #27D3F5; padding: 20px; color: white; text-align: center; } .daily-check { margin-top: 8px; font-size: 18px; font-weight: bold; font-style: italic; } table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 10px; } th, td { border: 1px solid #ccc; padding: 5px; text-align: left; } th { background-color: #f2f2f2; font-weight: bold; }</style></head><body>");
@@ -363,34 +312,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void resetAllStatusOnServer() {
         setLoading(true);
-        Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, Config.SCRIPT_URL + "?action=resetAll", response -> fetchData(true), error -> setLoading(false)));
+        String url = Config.SCRIPT_URL + "?action=resetAll";
+        Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, url, response -> {
+            for (InventoryModel item : fullInventoryList) item.setStatus("Unchecked"); // লোকালে সব আনচেক করা
+            updateCheckedCount(); // কাউন্ট রিসেট
+            fetchData(true);
+        }, error -> setLoading(false)));
     }
 
-    public void setLoading(boolean isLoading) {
-        this.loadingState = isLoading;
-        if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-    }
-
-    private void syncOfflineData() {
-        Cursor cursor = dbHelper.getAllPending();
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                sendOfflineUpdateToServer(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CODE)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SHORT)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EXCESS)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_REMARK)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_STATUS)));
-            } while (cursor.moveToNext());
-            cursor.close();
-        }
-    }
-
-    private void sendOfflineUpdateToServer(String code, String s, String e, String r, String status) {
-        try {
-            String url = Config.SCRIPT_URL + "?action=updateStock&code=" + URLEncoder.encode(code, "UTF-8") + "&shortQty=" + s + "&excessQty=" + e + "&remark=" + URLEncoder.encode(r, "UTF-8") + "&status=" + status;
-            Volley.newRequestQueue(this).add(new StringRequest(Request.Method.GET, url, res -> dbHelper.deleteUpdate(code), err -> {}));
-        } catch (Exception ex) { ex.printStackTrace(); }
-    }
-
+    public void setLoading(boolean isLoading) { this.loadingState = isLoading; if (progressBar != null) progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE); }
     public boolean isLoading() { return loadingState; }
 }

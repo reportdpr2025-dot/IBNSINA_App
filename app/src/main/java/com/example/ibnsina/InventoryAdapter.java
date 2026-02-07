@@ -54,7 +54,6 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         InventoryModel model = list.get(position);
 
-        // সিরিয়াল নম্বর সেট করা
         if (holder.tvSl != null) {
             String slValue = (model.getSl() != null && !model.getSl().isEmpty()) ? model.getSl() : String.valueOf(position + 1);
             holder.tvSl.setText(slValue);
@@ -114,6 +113,11 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
                 model.setStatus(status);
                 sendData(model.getCode(), holder.etShortQty.getText().toString(),
                         holder.etExcessQty.getText().toString(), holder.etRemark.getText().toString(), status);
+                
+                // কাউন্টার আপডেট করা
+                if (context instanceof MainActivity) {
+                    ((MainActivity) context).updateCheckedCount();
+                }
             } else {
                 holder.btnCheckUpdate.setChecked(true); 
                 Toast.makeText(context, "Long press to uncheck", Toast.LENGTH_SHORT).show();
@@ -136,6 +140,11 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
                             holder.itemContainer.setBackgroundColor(Color.WHITE);
                             sendData(model.getCode(), holder.etShortQty.getText().toString(),
                                     holder.etExcessQty.getText().toString(), holder.etRemark.getText().toString(), status);
+                            
+                            // কাউন্টার আপডেট করা
+                            if (context instanceof MainActivity) {
+                                ((MainActivity) context).updateCheckedCount();
+                            }
                         })
                         .setNegativeButton("No", null)
                         .show();
