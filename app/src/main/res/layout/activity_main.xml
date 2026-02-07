@@ -100,7 +100,7 @@
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
                 android:hint="Search products..."
-                android:paddingStart="8dp"
+                android:paddingStart="10dp"
                 android:textSize="14sp" />
 
             <View
@@ -116,7 +116,7 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Action Buttons Row -->
+    <!-- Action Buttons Row (Clear Background and Visible) -->
     <LinearLayout
         android:id="@+id/actionLayout"
         android:layout_width="match_parent"
@@ -127,51 +127,63 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefreshManual"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Refresh"
-            android:textColor="#4CAF50"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
+            android:backgroundTint="#4CAF50"
+            android:layout_margin="2dp"
+            app:cornerRadius="8dp"
             app:icon="@android:drawable/stat_notify_sync"
-            app:iconTint="#4CAF50" />
+            app:iconTint="#FFFFFF"
+            app:iconPadding="2dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnResetAll"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Reset"
-            android:textColor="#F44336"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
+            android:backgroundTint="#F44336"
+            android:layout_margin="2dp"
+            app:cornerRadius="8dp"
             app:icon="@android:drawable/ic_menu_revert"
-            app:iconTint="#F44336" />
+            app:iconTint="#FFFFFF"
+            app:iconPadding="2dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPrint"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Print"
-            android:textColor="#009688"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
+            android:backgroundTint="#009688"
+            android:layout_margin="2dp"
+            app:cornerRadius="8dp"
             app:icon="@android:drawable/ic_menu_share"
-            app:iconTint="#009688" />
+            app:iconTint="#FFFFFF"
+            app:iconPadding="2dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCalculator"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Calc"
-            android:textColor="#673AB7"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
+            android:backgroundTint="#673AB7"
+            android:layout_margin="2dp"
+            app:cornerRadius="8dp"
             app:icon="@drawable/ic_calculator"
-            app:iconTint="#673AB7" />
+            app:iconTint="#FFFFFF"
+            app:iconPadding="2dp"/>
     </LinearLayout>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -190,7 +202,7 @@
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Pagination & Checked Counter (Unified Bar) -->
+    <!-- Pagination Bar -->
     <LinearLayout
         android:id="@+id/paginationLayout"
         android:layout_width="match_parent"
@@ -209,7 +221,7 @@
             android:layout_height="wrap_content"
             android:text="Back"
             android:textColor="#1B5E20"
-            android:textSize="10sp"
+            android:textSize="11sp"
             app:icon="@android:drawable/ic_menu_revert"
             app:iconTint="#1B5E20" />
 
@@ -225,7 +237,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Prev"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -240,7 +252,7 @@
                 android:layout_height="wrap_content"
                 android:text="All Items"
                 android:textColor="#333333"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -249,7 +261,7 @@
                 android:layout_height="wrap_content"
                 android:text="Checked: 0"
                 android:textColor="#D32F2F"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -259,7 +271,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Next"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 
     <ProgressBar

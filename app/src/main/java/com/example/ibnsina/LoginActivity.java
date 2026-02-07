@@ -27,7 +27,7 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // সেশন চেক - আগে লগইন করা থাকলে ড্যাশবোর্ডে পাঠাবে
+        // সেশন চেক
         SharedPreferences prefs = getSharedPreferences("USER_SESSION", MODE_PRIVATE);
         if (prefs.getBoolean("isLoggedIn", false)) {
             startActivity(new Intent(this, DashboardActivity.class));
@@ -44,15 +44,13 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin = findViewById(R.id.btnLogin);
         loginProgressBar = findViewById(R.id.loginProgressBar);
 
-        etPass.setEnabled(true);
-        btnLogin.setEnabled(true);
-
+        // অটোফিল লজিক (টাইপ করার সময়)
         etUser.addTextChangedListener(new TextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 String id = s.toString().trim().toUpperCase();
                 if (id.length() >= 4) {
-                    fetchAutoFillData(id, false);
+                    fetchAutoFillOnly(id); // শুধু নাম-পদবী নিয়ে আসবে
                 } else {
                     etName.setText("");
                     etDesignation.setText("");
@@ -65,57 +63,40 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin.setOnClickListener(v -> {
             String userId = etUser.getText().toString().trim().toUpperCase();
             String password = etPass.getText().toString().trim();
-            String currentName = etName.getText().toString().trim();
 
             if (userId.isEmpty() || password.isEmpty()) {
                 Toast.makeText(this, "আইডি এবং পাসওয়ার্ড দিন", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            if (currentName.isEmpty()) {
-                fetchAutoFillData(userId, true);
-            } else {
-                performLogin(userId, password);
-            }
+            // সরাসরি লগইন এবং অটোফিল একসাথে শুরু করবে
+            performFullLogin(userId, password);
         });
     }
 
-    private void fetchAutoFillData(String userId, boolean shouldLoginAfterFetch) {
-        if (loginProgressBar != null) loginProgressBar.setVisibility(View.VISIBLE);
-        
+    // টাইপ করার সময় শুধু ডাটা ফেচ করার জন্য (লগইন করবে না)
+    private void fetchAutoFillOnly(String userId) {
         String url = Config.SCRIPT_URL + "?action=getAutoFill&userId=" + userId;
         StringRequest request = new StringRequest(Request.Method.GET, url,
                 response -> {
-                    if (loginProgressBar != null) loginProgressBar.setVisibility(View.GONE);
                     try {
                         JSONObject json = new JSONObject(response);
                         if (json.getBoolean("success")) {
                             etName.setText(json.getString("name"));
                             etDesignation.setText(json.getString("designation"));
-
-                            if (shouldLoginAfterFetch) {
-                                performLogin(userId, etPass.getText().toString().trim());
-                            }
-                        } else {
-                            if (shouldLoginAfterFetch) {
-                                Toast.makeText(this, "সঠিক ইউজার আইডি পাওয়া যায়নি!", Toast.LENGTH_SHORT).show();
-                            }
-                            etName.setText("");
-                            etDesignation.setText("");
                         }
                     } catch (JSONException e) { e.printStackTrace(); }
-                }, error -> {
-            if (loginProgressBar != null) loginProgressBar.setVisibility(View.GONE);
-            if (shouldLoginAfterFetch) Toast.makeText(this, "সার্ভার এরর!", Toast.LENGTH_SHORT).show();
-        });
+                }, error -> {});
         Volley.newRequestQueue(this).add(request);
     }
 
-    private void performLogin(String userId, String password) {
+    // লগইন বাটনে ক্লিক করলে এই মেথডটি কাজ করবে
+    private void performFullLogin(String userId, String password) {
         if (loginProgressBar != null) loginProgressBar.setVisibility(View.VISIBLE);
         btnLogin.setText("Checking...");
         btnLogin.setEnabled(false);
 
+        // গুগল স্ক্রিপ্ট এমনভাবে সেট করা যাতে এটি সাকসেস হলে নাম ও পদবীও পাঠায়
         String url = Config.SCRIPT_URL + "?action=login&userId=" + userId + "&password=" + password;
 
         StringRequest loginRequest = new StringRequest(Request.Method.GET, url,
@@ -126,9 +107,11 @@ public class LoginActivity extends AppCompatActivity {
                     try {
                         JSONObject json = new JSONObject(response);
                         if (json.getBoolean("success")) {
-                            String userName = etName.getText().toString().trim();
-                            String designation = etDesignation.getText().toString().trim();
+                            // সার্ভার থেকে নাম ও পদবী নিয়ে আসা (যদি অ্যাপে তখনো অটোফিল না হয়ে থাকে)
+                            String userName = json.optString("name", etName.getText().toString().trim());
+                            String designation = json.optString("designation", etDesignation.getText().toString().trim());
 
+                            // সেশন সেভ করা
                             SharedPreferences.Editor editor = getSharedPreferences("USER_SESSION", MODE_PRIVATE).edit();
                             editor.putBoolean("isLoggedIn", true);
                             editor.putString("userId", userId);
@@ -139,9 +122,11 @@ public class LoginActivity extends AppCompatActivity {
                             startActivity(new Intent(this, DashboardActivity.class));
                             finish();
                         } else {
-                            Toast.makeText(this, "পাসওয়ার্ড ভুল!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "আইডি বা পাসওয়ার্ড ভুল!", Toast.LENGTH_SHORT).show();
                         }
-                    } catch (JSONException e) { e.printStackTrace(); }
+                    } catch (JSONException e) { 
+                        Toast.makeText(this, "ডাটা প্রসেসিং এরর!", Toast.LENGTH_SHORT).show();
+                    }
                 }, error -> {
             if (loginProgressBar != null) loginProgressBar.setVisibility(View.GONE);
             btnLogin.setEnabled(true);
