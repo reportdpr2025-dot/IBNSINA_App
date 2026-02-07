@@ -14,7 +14,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="145dp"
-            android:background="@drawable/header_gradient"
+            android:background="@color/design_default_color_secondary_variant"
             android:gravity="top"
             android:orientation="horizontal"
             android:paddingLeft="15dp"
@@ -24,16 +24,16 @@
             <ImageView
                 android:layout_width="60dp"
                 android:layout_height="60dp"
-                android:src="@drawable/logo"
                 android:layout_marginTop="5dp"
                 android:layout_marginEnd="10dp"
-                android:contentDescription="Logo" />
+                android:contentDescription="Logo"
+                android:src="@drawable/logo" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginTop="10dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
@@ -55,12 +55,12 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
                     android:layout_marginTop="2dp"
                     android:text="DINAJPUR DEPOT"
+                    android:textAlignment="center"
                     android:textColor="#D1E7D3"
-                    android:textSize="14sp"
-                    android:layout_gravity="center_horizontal"
-                    android:textAlignment="center" />
+                    android:textSize="14sp" />
 
             </LinearLayout>
 

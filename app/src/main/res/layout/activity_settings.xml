@@ -1,84 +1,166 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F7FA"
-    android:orientation="vertical">
+    android:background="#F8F9FA">
 
-    <LinearLayout
+    <!-- Header Gradient Background -->
+    <View
+        android:id="@+id/headerBackground"
         android:layout_width="match_parent"
-        android:layout_height="140dp"
-        android:background="#7B1FA2"
+        android:layout_height="240dp"
+        android:background="@drawable/header_gradient"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Back Button -->
+    <ImageButton
+        android:id="@+id/btnBack"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_margin="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_revert"
+        app:tint="#FFFFFF"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:contentDescription="Back" />
+
+    <!-- Title and Illustration Placeholder -->
+    <LinearLayout
+        android:id="@+id/titleLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="20dp">
+        app:layout_constraintBottom_toBottomOf="@id/headerBackground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.35">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="🔒"
+            android:textSize="40sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="পাসওয়ার্ড পরিবর্তন"
             android:textColor="#FFFFFF"
-            android:textSize="24sp"
+            android:textSize="26sp"
+            android:fontFamily="serif"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Main Card Container -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="20dp"
-        android:layout_marginTop="-30dp"
-        app:cardCornerRadius="15dp"
-        app:cardElevation="8dp">
+        android:layout_marginHorizontal="24dp"
+        app:cardCornerRadius="25dp"
+        app:cardElevation="15dp"
+        app:layout_constraintTop_toBottomOf="@id/titleLayout"
+        android:layout_marginTop="20dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="24dp">
 
-            <EditText
-                android:id="@+id/etOldPass"
+            <TextView
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@android:drawable/editbox_background"
-                android:hint="বর্তমান পাসওয়ার্ড দিন"
-                android:inputType="textPassword"
-                android:paddingLeft="10dp"
-                android:layout_marginBottom="15dp"/>
+                android:layout_height="wrap_content"
+                android:text="নিরাপত্তার জন্য আপনার পাসওয়ার্ড কাউকে শেয়ার করবেন না"
+                android:textColor="#777777"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:layout_marginBottom="24dp" />
 
-            <EditText
-                android:id="@+id/etNewPass"
+            <!-- Current Password -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@android:drawable/editbox_background"
-                android:hint="নতুন পাসওয়ার্ড দিন"
-                android:inputType="textPassword"
-                android:paddingLeft="10dp"
-                android:layout_marginBottom="15dp"/>
+                android:layout_height="wrap_content"
+                android:hint="বর্তমান পাসওয়ার্ড"
+                app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
+                app:endIconMode="password_toggle"
+                app:boxStrokeColor="#7B1FA2"
+                app:hintTextColor="#7B1FA2"
+                app:startIconTint="#7B1FA2"
+                android:layout_marginBottom="16dp">
 
-            <EditText
-                android:id="@+id/etConfirmPass"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etOldPass"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:textColor="#212121"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- New Password -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@android:drawable/editbox_background"
-                android:hint="আবার নতুন পাসওয়ার্ড দিন"
-                android:inputType="textPassword"
-                android:paddingLeft="10dp"
-                android:layout_marginBottom="25dp"/>
+                android:layout_height="wrap_content"
+                android:hint="নতুন পাসওয়ার্ড"
+                app:startIconDrawable="@android:drawable/ic_lock_lock"
+                app:endIconMode="password_toggle"
+                app:boxStrokeColor="#7B1FA2"
+                app:hintTextColor="#7B1FA2"
+                app:startIconTint="#7B1FA2"
+                android:layout_marginBottom="16dp">
 
-            <Button
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etNewPass"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:textColor="#212121"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Confirm New Password -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="পুনরায় নতুন পাসওয়ার্ড"
+                app:startIconDrawable="@android:drawable/ic_lock_lock"
+                app:endIconMode="password_toggle"
+                app:boxStrokeColor="#7B1FA2"
+                app:hintTextColor="#7B1FA2"
+                app:startIconTint="#7B1FA2"
+                android:layout_marginBottom="32dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etConfirmPass"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:textColor="#212121"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Update Button -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnUpdatePass"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
+                android:layout_height="60dp"
                 android:text="পাসওয়ার্ড আপডেট করুন"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:backgroundTint="#7B1FA2"
                 android:textColor="#FFFFFF"
-                app:cornerRadius="10dp"/>
+                app:cornerRadius="15dp"
+                app:elevation="8dp" />
 
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

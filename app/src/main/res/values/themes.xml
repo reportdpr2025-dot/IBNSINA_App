@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.IBNSINA" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- থিমটিকে DayNight থেকে পরিবর্তন করে Light করা হলো -->
+    <style name="Theme.IBNSINA" parent="Theme.Material3.Light.NoActionBar">
         <item name="android:statusBarColor">#1B5E20</item>
 
         <item name="colorPrimary">#1B5E20</item>
-        <item name="colorPrimaryVariant">#0D3D0E</item>
         <item name="colorOnPrimary">#FFFFFF</item>
 
-        <item name="android:windowLightStatusBar">false</item>
+        <!-- ডার্ক মুড ইগনোর করার জন্য -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
     </style>
 
 </resources>
